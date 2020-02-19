@@ -57,11 +57,11 @@ function upload() {
         // Do nothing if no card name
       }  
       else if (currentTime.valueOf() - startTime.valueOf() >= 330000) { // 5.5 minutes - scripts time out at 6 minutes
-        Browser.msgBox("WARNING: Script was about to time out so upload has been terminated gracefully ." + successCount + " backlog items were uploaded successfully.");
+        Browser.msgBox("WARNING: Script was about to time out so upload has been terminated gracefully ." + successCount + " items were uploaded successfully.");
         return;
       }
       else if (status == "Started") {
-        Browser.msgBox("Error: Backlog item at row " + r + " has a status of 'Started' which means the Trello card MAY have been partially created for this item. Verify the state of the card, and either:\na) Delete the card from Trello if it's incomplete, and change status cell to blank.\n b)If card is complete, then change the status of the backlog item to 'Completed'");
+        Browser.msgBox("Error: Item at row " + r + " has a status of 'Started' which means the Trello card MAY have been partially created for this item. Verify the state of the card, and either:\na) Delete the card from Trello if it's incomplete, and change status cell to blank.\n b)If card is complete, then change the status of the item to 'Completed'");
         return;
       }  
       else if (status == "") {
@@ -124,12 +124,12 @@ function upload() {
           
       }
       else if (status != "Completed") {
-          Browser.msgBox("Error: Backlog item at row " + r + " has a status of '" + status + "' Change status to 'Completed' if not required, or clear it to allow it to be uploaded." );
+          Browser.msgBox("Error: Item at row " + r + " has a status of '" + status + "' Change status to 'Completed' if not required, or clear it to allow it to be uploaded." );
         return;
       }    
      
     }
-    Browser.msgBox( successCount + " backlog items were uploaded successfully.");
+    Browser.msgBox( successCount + " items were uploaded successfully.");
     return;
 }
 
