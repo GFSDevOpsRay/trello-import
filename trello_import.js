@@ -408,3 +408,20 @@ function displayMembers() {
   
   return;
 }
+
+
+// post
+
+var data = {
+  'name': 'Bob Smith',
+};
+var options = {
+  'method' : 'post',
+  'contentType': 'application/json',
+  // Convert the JavaScript object to a JSON string.
+  'payload' : JSON.stringify(data)
+};
+
+
+UrlFetchApp.fetch('https://trello.com/1/cards?idList=5e4d42c517149e7e139b3d93&key=46d119da0b6655955a75fe9d9c032af9&token=a73ae6809abe4c0dee7289ab96ba99cff2629a3d250ed6be7ec0f18d6c0f6d70', options);
+
