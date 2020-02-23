@@ -423,11 +423,4 @@ var options = {
 };
 
 
-UrlFetchApp.fetch('https://trello.com/1/cards?idList=5e4d42c517149e7e139b3d93&key=46d119da0b6655955a75fe9d9c032af9&token=a73ae6809abe4c0dee7289ab96ba99cff2629a3d250ed6be7ec0f18d6c0f6d70', options);
 
-
-// GetBoards: https://trello.com/1/members/me/boards?key=46d119da0b6655955a75fe9d9c032af9&token=a73ae6809abe4c0dee7289ab96ba99cff2629a3d250ed6be7ec0f18d6c0f6d70
-// GetLists: https://trello.com/1/boards/5e4afbc568bf95453ff92ecb/lists?key=46d119da0b6655955a75fe9d9c032af9&token=a73ae6809abe4c0dee7289ab96ba99cff2629a3d250ed6be7ec0f18d6c0f6d70
-// GetCards: https://trello.com/1/lists/5e4d42cb9a0708272b082eac/cards?key=46d119da0b6655955a75fe9d9c032af9&token=a73ae6809abe4c0dee7289ab96ba99cff2629a3d250ed6be7ec0f18d6c0f6d70
-// PostCard: https://trello.com/1/cards?idList=5e4d42c517149e7e139b3d93&key=46d119da0b6655955a75fe9d9c032af9&token=a73ae6809abe4c0dee7289ab96ba99cff2629a3d250ed6be7ec0f18d6c0f6d70
-// UpdateCard: https://trello.com/1/cards/5e51582f65cb18665fab1d37/name?value=test&key=46d119da0b6655955a75fe9d9c032af9&token=a73ae6809abe4c0dee7289ab96ba99cff2629a3d250ed6be7ec0f18d6c0f6d70
