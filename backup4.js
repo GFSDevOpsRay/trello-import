@@ -98,7 +98,13 @@ function upload() {
             dueDate = currentRow[5];
           }  
           
-          var card = createTrelloCard(currentRow[2],currentRow[3],currentRow[4],listId,dueDate,currentRow[7]);
+          // check if title from spreadsheet is in api call for that list, if so, update card
+          var name = getCards(listId, currentRow[2]);
+          //var updateCard = updateTrelloCard(currentRow[2]);
+
+          // post
+          var card = createTrelloCard(currentRow[2],currentRow[3],currentRow[4],listId,dueDate,currentRow[7]);        
+          
           createTrelloAttachment(card.id,currentRow[8]);
           addTrelloLabels(card.id,currentRow[6],existingLabels);
           var comment = currentRow[9];
@@ -114,7 +120,7 @@ function upload() {
             if (headerRow[i] !== "" && currentRow[i] !== "") {
               addChecklist(card, boardID,headerRow[i],currentRow[i]);
             }  
-          }  
+          }
         }  
         
         statusCell.setValue("Completed");   
@@ -171,9 +177,6 @@ function addChecklist(card, boardID,checklistName, checklistData) {
 }  
   
 
- 
-  
-  
   
 function createTrelloCard(cardName, cardDesc, storyPoints, listID, dueDate,members){
   var name = cardName;
@@ -181,7 +184,7 @@ function createTrelloCard(cardName, cardDesc, storyPoints, listID, dueDate,membe
     name = "(" + storyPoints + ") " + cardName;
   }
   var url = constructTrelloURL("cards");
-  var payload = {"name":name,"desc":cardDesc,"due":"2012-02-02"};
+  var payload = {"name":name,"desc":cardDesc,"idList":listID,"due":dueDate};
   
   if (members !="") {
 
@@ -410,69 +413,47 @@ function displayMembers() {
 }
 
 
+// update -------------------------------------------------
 
-// update ------------------------------------------------
+function updateTrelloCard(cardId, cardName){
+  
+  //var cardId = "5e5392c58bd7a60dad78e627";
+  
 
-// first block ("Completed") needs to be blank
-
-
-
-function createTrelloCard(cardName, cardDesc, storyPoints, listID, dueDate,members){
+  var url = constructTrelloURL("cards/" + cardId);
+  
+  // new card contents
   var name = cardName;
-  if (storyPoints != "") {
-    name = "(" + storyPoints + ") " + cardName;
-  }
-  var url = constructTrelloURL("cards");
-  var payload = {"name":name,"desc":cardDesc,"idList":listID,"due":dueDate};
+  var desc = "1234";
+  var due = "2012-02-02";
   
-  if (members !="") {
-
-    payload.idMembers = members.replace(/\s/g,'');
-  }  
-  
-return postPayloadToTrello(url,payload);
-  
+  var payload = {"name": name,"desc": desc, "due": due};
+    
+  UrlFetchApp.fetch(url, {"method": "put", "payload":payload});
 }
 
 
 
-function updateTrelloCard() {
-  
-  var url = constructTrelloURL("cards/5e51582f65cb18665fab1d37/name?value=test4");
 
-  // var data = {
-  //   'name': 'Bob Smith',
-  // };
-  
-  // var options = {
-  //   'method' : 'put'
-  //   //,
-  //   //'contentType': 'application/json',
-  //   // Convert the JavaScript object to a JSON string.
-  //   //'payload' : JSON.stringify(data)
-  // };
+// if the value in the spreadsheet for card titls is in the api call for that list, run update -----------------
 
-  return putPayloadToTrello(url,payload);;
+function getCards(listId, cardName){
   
-  // UrlFetchApp.fetch("https://trello.com/1/cards/5e51582f65cb18665fab1d37/name?value=test3&key="+appKey+"&token="+token, options);
+  var newName = cardName;
+  
+  var url = constructTrelloURL("lists/" + listId + "/cards");
+  
+  var resp = UrlFetchApp.fetch(url, {"method": "get"});
+  
+  var values = Utilities.jsonParse(resp.getContentText());
+    
+    for (var i=values.length-1;i>=0;i--) {
+      if (newName == values[i].name)
+      {
+        cardId = values[i].id;
+        var updateCard = updateTrelloCard(cardId, newName);
+      }
+    }
 }
-
-function putPayloadToTrello(url,payload) {
-  var resp = UrlFetchApp.fetch(url, {"method": "put"});
-  return Utilities.jsonParse(resp.getContentText());
-}  
-
-
-
-
-// ----------------------------------------
-
-
-// return "https://trello.com/1/"+ baseURL +"?key="+appKey+"&token="+token;
-// GetBoards: https://trello.com/1/members/me/boards?key=key&token=token
-// GetLists: https://trello.com/1/boards/5e4afbc568bf95453ff92ecb/lists?key=key&token=token
-// GetCards: https://trello.com/1/lists/5e4d42cb9a0708272b082eac/cards?key=key&token=token
-// PostCard: https://trello.com/1/cards?idList=5e4d42c517149e7e139b3d93&key=key&token=token
-// UpdateCard: 
-
+    
 

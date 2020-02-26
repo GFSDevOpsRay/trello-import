@@ -98,29 +98,53 @@ function upload() {
             dueDate = currentRow[5];
           }  
           
-          var card = createTrelloCard(currentRow[2],currentRow[3],currentRow[4],listId,dueDate,currentRow[7]);
-          createTrelloAttachment(card.id,currentRow[8]);
-          addTrelloLabels(card.id,currentRow[6],existingLabels);
-          var comment = currentRow[9];
-          var comments = comment.split("\n");
+          // check if title from spreadsheet is in api call for that list, if so, update card
+          var cardExists = getCards(currentRow[2], currentRow[3], currentRow[4], listId, dueDate, currentRow[7], currentRow[6], existingLabels);
+
+          if (cardExists)
+          {
+            deleteCardAttachments(cardId);
+            createTrelloAttachment(cardId,currentRow[8]);
+            // delete all checklists in card
+            deleteCardChecklists(cardId);
+
+            // trying to work out checklists
+            
+            for (var i = 11; i < headerRow.length; i++) {
+              if (headerRow[i] !== "" && currentRow[i] !== "") {
+                updateChecklist(cardId, boardID,headerRow[i],currentRow[i]);
+              }  
+            }
           
-          for (var i = 0; i < comments.length; i++) {
-            if (comments[i] != "") {
-              createTrelloComment(card.id,comments[i]);
+          }
+          else
+          {
+            // post
+            var card = createTrelloCard(currentRow[2],currentRow[3],currentRow[4],listId,dueDate,currentRow[7]);        
+            
+            createTrelloAttachment(card.id,currentRow[8]);
+            addTrelloLabels(card.id,currentRow[6],existingLabels);
+            var comment = currentRow[9];
+            var comments = comment.split("\n");
+            
+            for (var i = 0; i < comments.length; i++) {
+              if (comments[i] != "") {
+                createTrelloComment(card.id,comments[i]);
+              }
+            }
+            
+            for (var i = 11; i < headerRow.length; i++) {
+              if (headerRow[i] !== "" && currentRow[i] !== "") {
+                addChecklist(card, boardID,headerRow[i],currentRow[i]);
+              }  
             }
           }
-          
-          for (var i = 11; i < headerRow.length; i++) {
-            if (headerRow[i] !== "" && currentRow[i] !== "") {
-              addChecklist(card, boardID,headerRow[i],currentRow[i]);
-            }  
-          }  
         }  
         
-        statusCell.setValue("Completed");   
-        SpreadsheetApp.flush();
-        partialCount --;
-        successCount ++;
+      statusCell.setValue("Completed");   
+      SpreadsheetApp.flush();
+      partialCount --;
+      successCount ++;
           
       }
       else if (status != "Completed") {
@@ -129,8 +153,8 @@ function upload() {
       }    
      
     }
-    Browser.msgBox( successCount + " items were uploaded successfully.");
-    return;
+     Browser.msgBox( successCount + " items were uploaded successfully.");
+     return;
 }
 
 function getExistingLabels(boardId) {
@@ -171,9 +195,6 @@ function addChecklist(card, boardID,checklistName, checklistData) {
 }  
   
 
- 
-  
-  
   
 function createTrelloCard(cardName, cardDesc, storyPoints, listID, dueDate,members){
   var name = cardName;
@@ -181,7 +202,7 @@ function createTrelloCard(cardName, cardDesc, storyPoints, listID, dueDate,membe
     name = "(" + storyPoints + ") " + cardName;
   }
   var url = constructTrelloURL("cards");
-  var payload = {"name":name,"desc":cardDesc,"due":"2012-02-02"};
+  var payload = {"name":name,"desc":cardDesc,"idList":listID,"due":dueDate};
   
   if (members !="") {
 
@@ -397,82 +418,156 @@ function displayMembers() {
     html.append("<table><thead><tr>");
     html.append("<th style='border:1px black solid;text-align:left;padding:.25em;'>Member Name</th>");
     html.append("<th style='border:1px black solid;text-align:left;padding:.25em;'>Member Id</th></tr></thead>");
-  
-    
     for (var i=values.length-1;i>=0;i--) {
       html.append("<tr><td style='border:1px black solid;padding:.25em;'>"+values[i].fullName+"</td><td style='border:1px black solid;padding:.25em;'>"+values[i].id+"</td></tr>");
-    }
-   
-                     
+    }        
     SpreadsheetApp.getActiveSpreadsheet().show(html);
   
   return;
 }
 
 
+// update code
 
-// update ------------------------------------------------
+// Update card -------------------------------------------------
 
-// first block ("Completed") needs to be blank
+function updateTrelloCard(cardId, cardName, cardDesc, cardDue, members, cardLabels, existingLabels){
 
-
-
-function createTrelloCard(cardName, cardDesc, storyPoints, listID, dueDate,members){
-  var name = cardName;
-  if (storyPoints != "") {
-    name = "(" + storyPoints + ") " + cardName;
-  }
-  var url = constructTrelloURL("cards");
-  var payload = {"name":name,"desc":cardDesc,"idList":listID,"due":dueDate};
-  
+  var url = constructTrelloURL("cards/" + cardId);
+  var payload = {"name": cardName,"desc": cardDesc, "due": cardDue, "idLabels": "", "labels": "", "idChecklists": ""};
   if (members !="") {
-
     payload.idMembers = members.replace(/\s/g,'');
+  }    
+  
+  UrlFetchApp.fetch(url, {"method": "put", "payload":payload});
+  
+  updateTrelloLabels(cardId, cardLabels, existingLabels);
+
+}
+
+
+// Attachments. Delete attachments before readding new ones. No "PUT" request for them. 
+
+function deleteCardAttachments(cardId)
+{
+  var url = constructTrelloURL("cards/" + cardId + "/attachments");
+  var resp = UrlFetchApp.fetch(url, {"method": "get"});
+  var values = Utilities.jsonParse(resp.getContentText());
+    for (var i=values.length-1;i>=0;i--) {
+      {
+         attachmentId = values[i].id;
+         var url = constructTrelloURL("cards/" + cardId + "/attachments/" + attachmentId);
+         UrlFetchApp.fetch(url, {"method": "delete"});
+      }
+    }
+}
+
+
+function deleteCardChecklists(cardId)
+{
+  var url = constructTrelloURL("cards/" + cardId + "/checklists");
+  var resp = UrlFetchApp.fetch(url, {"method": "get"});
+  var values = Utilities.jsonParse(resp.getContentText());
+    for (var i=values.length-1;i>=0;i--) {
+      {
+         checklistId = values[i].id;
+         var url = constructTrelloURL("cards/" + cardId + "/checklists/" + checklistId);
+         UrlFetchApp.fetch(url, {"method": "delete"});
+      }
+   }
+}
+
+
+
+// update labels - unfinished
+function updateTrelloLabels(cardID, label, existingLabels){
+  // if cell is empty
+  if (label == "" ) {
+    return;
   }  
   
-return postPayloadToTrello(url,payload);
+  // create array
+  var labels = label.split(",");
   
+  // loop through array
+  for (var i= 0; i< labels.length;i++) {
+    
+    // get ids of existing labels on the board
+    var labelId = getIdForLabelName(labels[i],existingLabels);
+    
+    // if label id doesnt already exist (if new label), create label on card with new label;
+    if (labelId == null) {
+      var url = constructTrelloURL("cards/"+ cardID + "/labels");
+      var resp = postPayloadToTrello(url,{"color":null,"name":labels[i]});
+    }
+    // use existing id and put label on card
+    else {
+     
+      var url = constructTrelloURL("cards/"+ cardID + "/idLabels");
+        var resp = postPayloadToTrello(url,{"value":labelId});
+      }
+ 
+  }  
+  return;
 }
 
 
 
-function updateTrelloCard() {
-  
-  var url = constructTrelloURL("cards/5e51582f65cb18665fab1d37/name?value=test4");
 
-  // var data = {
-  //   'name': 'Bob Smith',
-  // };
+function updateChecklist(cardId, boardID, checklistName, checklistData) {
   
-  // var options = {
-  //   'method' : 'put'
-  //   //,
-  //   //'contentType': 'application/json',
-  //   // Convert the JavaScript object to a JSON string.
-  //   //'payload' : JSON.stringify(data)
-  // };
-
-  return putPayloadToTrello(url,payload);;
+  var data = checklistData.split("\n");
+  var checklist = null;
+ 
   
-  // UrlFetchApp.fetch("https://trello.com/1/cards/5e51582f65cb18665fab1d37/name?value=test3&key="+appKey+"&token="+token, options);
-}
-
-function putPayloadToTrello(url,payload) {
-  var resp = UrlFetchApp.fetch(url, {"method": "put"});
-  return Utilities.jsonParse(resp.getContentText());
+  for (var i = 0; i < data.length; i++) {
+    if (data[i] != "") {
+      if (checklist == null) {
+         checklist = createTrelloChecklist(cardId,checklistName);
+      }  
+      createTrelloChecklistItem(checklist.id,data[i]);
+    }
+    
+  } 
+  
+  if (checklist !== null) {
+    addTrelloChecklistToCard(checklist.id, cardId);
+  }  
+  
 }  
 
 
 
+// check if card exists in the list (is the title there)
+// if the value in the spreadsheet for card titles is in the api call for that list, run update -----------------
 
-// ----------------------------------------
+function getCards(cardName, cardDesc, cardPoints, listId, cardDue, cardMembers, cardLabels, existingLabels){  
+ 
+  // get all cards in the list
+  var url = constructTrelloURL("lists/" + listId + "/cards");
+  var resp = UrlFetchApp.fetch(url, {"method": "get"});
+  var values = Utilities.jsonParse(resp.getContentText());
+  
+  // cycle through the cards in the list
+  for (var i=values.length-1;i>=0;i--) {    
+        
+    // check if the card exists, remove the "points" from its name
+    if (cardName == values[i].name.replace(/ *\([^)]*\) */g, ""))
+    {
+      cardId = values[i].id;
+      
+      // add any new points to its name
+      if (cardPoints != "") {
+      cardName = "(" + cardPoints + ") " + cardName;
+      }
+      
+      var updateCard = updateTrelloCard(cardId, cardName, cardDesc, cardDue, cardMembers, cardLabels, existingLabels);
+      var cardExists = true;
+    }
+  }
+  return cardExists;
+}
 
 
-// return "https://trello.com/1/"+ baseURL +"?key="+appKey+"&token="+token;
-// GetBoards: https://trello.com/1/members/me/boards?key=key&token=token
-// GetLists: https://trello.com/1/boards/5e4afbc568bf95453ff92ecb/lists?key=key&token=token
-// GetCards: https://trello.com/1/lists/5e4d42cb9a0708272b082eac/cards?key=key&token=token
-// PostCard: https://trello.com/1/cards?idList=5e4d42c517149e7e139b3d93&key=key&token=token
-// UpdateCard: 
-
+ 
 

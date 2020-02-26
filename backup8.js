@@ -98,23 +98,38 @@ function upload() {
             dueDate = currentRow[5];
           }  
           
-          var card = createTrelloCard(currentRow[2],currentRow[3],currentRow[4],listId,dueDate,currentRow[7]);
-          createTrelloAttachment(card.id,currentRow[8]);
-          addTrelloLabels(card.id,currentRow[6],existingLabels);
-          var comment = currentRow[9];
-          var comments = comment.split("\n");
-          
-          for (var i = 0; i < comments.length; i++) {
-            if (comments[i] != "") {
-              createTrelloComment(card.id,comments[i]);
+          // check if title from spreadsheet is in api call for that list, if so, update card
+          var cardExists = getCards(currentRow[2], currentRow[3], currentRow[4], listId, dueDate, currentRow[7]);
+          //var updateCard = updateTrelloCard(currentRow[2]);
+
+          if (cardExists)
+          {
+             // updateTrelloLabels(cardExists.id,currentRow[6],existingLabels);
+            deleteCardAttachments(cardId);
+            createTrelloAttachment(cardId,currentRow[8]);
+          }
+          else
+          {
+            // post
+            var card = createTrelloCard(currentRow[2],currentRow[3],currentRow[4],listId,dueDate,currentRow[7]);        
+            
+            createTrelloAttachment(card.id,currentRow[8]);
+            addTrelloLabels(card.id,currentRow[6],existingLabels);
+            var comment = currentRow[9];
+            var comments = comment.split("\n");
+            
+            for (var i = 0; i < comments.length; i++) {
+              if (comments[i] != "") {
+                createTrelloComment(card.id,comments[i]);
+              }
+            }
+            
+            for (var i = 11; i < headerRow.length; i++) {
+              if (headerRow[i] !== "" && currentRow[i] !== "") {
+                addChecklist(card, boardID,headerRow[i],currentRow[i]);
+              }  
             }
           }
-          
-          for (var i = 11; i < headerRow.length; i++) {
-            if (headerRow[i] !== "" && currentRow[i] !== "") {
-              addChecklist(card, boardID,headerRow[i],currentRow[i]);
-            }  
-          }  
         }  
         
         statusCell.setValue("Completed");   
@@ -171,9 +186,6 @@ function addChecklist(card, boardID,checklistName, checklistData) {
 }  
   
 
- 
-  
-  
   
 function createTrelloCard(cardName, cardDesc, storyPoints, listID, dueDate,members){
   var name = cardName;
@@ -181,7 +193,7 @@ function createTrelloCard(cardName, cardDesc, storyPoints, listID, dueDate,membe
     name = "(" + storyPoints + ") " + cardName;
   }
   var url = constructTrelloURL("cards");
-  var payload = {"name":name,"desc":cardDesc,"due":"2012-02-02"};
+  var payload = {"name":name,"desc":cardDesc,"idList":listID,"due":dueDate};
   
   if (members !="") {
 
@@ -410,69 +422,87 @@ function displayMembers() {
 }
 
 
+// update card -------------------------------------------------
 
-// update ------------------------------------------------
+function updateTrelloCard(cardId, cardName, cardDesc, cardDue, members){
 
-// first block ("Completed") needs to be blank
-
-
-
-function createTrelloCard(cardName, cardDesc, storyPoints, listID, dueDate,members){
-  var name = cardName;
-  if (storyPoints != "") {
-    name = "(" + storyPoints + ") " + cardName;
-  }
-  var url = constructTrelloURL("cards");
-  var payload = {"name":name,"desc":cardDesc,"idList":listID,"due":dueDate};
+  var url = constructTrelloURL("cards/" + cardId);
+  
+  var payload = {"name": cardName,"desc": cardDesc, "due": cardDue};
   
   if (members !="") {
-
     payload.idMembers = members.replace(/\s/g,'');
+  }    
+  
+  UrlFetchApp.fetch(url, {"method": "put", "payload":payload});
+}
+
+
+function deleteCardAttachments(cardId)
+{
+  var url = constructTrelloURL("cards/" + cardId + "/attachments");
+  var resp = UrlFetchApp.fetch(url, {"method": "get"});
+  var values = Utilities.jsonParse(resp.getContentText());
+    for (var i=values.length-1;i>=0;i--) {
+      {
+         attachmentId = values[i].id;
+         var url = constructTrelloURL("cards/" + cardId + "/attachments/" + attachmentId);
+         UrlFetchApp.fetch(url, {"method": "delete"});
+      }
+    }
+}
+
+
+// update labels - unfinished
+function updateTrelloLabels(cardID, label,existingLabels){
+  if (label == "" ) {
+    return;
   }  
-  
-return postPayloadToTrello(url,payload);
-  
+  var labels = label.split(",");
+  for (var i= 0; i< labels.length;i++) {
+    var labelId = getIdForLabelName(labels[i],existingLabels);
+    if (labelId == null) {
+      var url = constructTrelloURL("cards/"+ cardID + "/labels");
+      var resp = postPayloadToTrello(url,{"color":null,"name":labels[i]});
+    }
+    else {
+      var url = constructTrelloURL("cards/"+ cardID + "/idLabels");
+      var resp = postPayloadToTrello(url,{"value":labelId});
+    }  
+  }  
+  return;
 }
 
 
+// check if card exists in the list (is the title there)
+// if the value in the spreadsheet for card titles is in the api call for that list, run update -----------------
 
-function updateTrelloCard() {
+function getCards(cardName, cardDesc, cardPoints, listId, cardDue, cardMembers){
   
-  var url = constructTrelloURL("cards/5e51582f65cb18665fab1d37/name?value=test4");
-
-  // var data = {
-  //   'name': 'Bob Smith',
-  // };
+  // var cardNameNoPoints = cardName;
   
-  // var options = {
-  //   'method' : 'put'
-  //   //,
-  //   //'contentType': 'application/json',
-  //   // Convert the JavaScript object to a JSON string.
-  //   //'payload' : JSON.stringify(data)
-  // };
-
-  return putPayloadToTrello(url,payload);;
+  //cardNameNoPoints = cardNameNoPoints.replace(/ *\([^)]*\) */g, "");
   
-  // UrlFetchApp.fetch("https://trello.com/1/cards/5e51582f65cb18665fab1d37/name?value=test3&key="+appKey+"&token="+token, options);
+  
+  if (cardPoints != "") {
+    cardName = "(" + cardPoints + ") " + cardName;
+  }
+    
+  var url = constructTrelloURL("lists/" + listId + "/cards");
+  
+  var resp = UrlFetchApp.fetch(url, {"method": "get"});
+  
+  var values = Utilities.jsonParse(resp.getContentText());
+    
+    for (var i=values.length-1;i>=0;i--) {
+      if (cardName == values[i].name)
+      {
+        cardId = values[i].id;
+        var updateCard = updateTrelloCard(cardId, cardName, cardDesc, cardDue, cardMembers);
+        var cardExists = true;
+      }
+    }
+  return cardExists;
 }
-
-function putPayloadToTrello(url,payload) {
-  var resp = UrlFetchApp.fetch(url, {"method": "put"});
-  return Utilities.jsonParse(resp.getContentText());
-}  
-
-
-
-
-// ----------------------------------------
-
-
-// return "https://trello.com/1/"+ baseURL +"?key="+appKey+"&token="+token;
-// GetBoards: https://trello.com/1/members/me/boards?key=key&token=token
-// GetLists: https://trello.com/1/boards/5e4afbc568bf95453ff92ecb/lists?key=key&token=token
-// GetCards: https://trello.com/1/lists/5e4d42cb9a0708272b082eac/cards?key=key&token=token
-// PostCard: https://trello.com/1/cards?idList=5e4d42c517149e7e139b3d93&key=key&token=token
-// UpdateCard: 
-
+    
 
